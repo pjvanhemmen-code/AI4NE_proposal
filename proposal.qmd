@@ -23,26 +23,17 @@ HOW TO USE THIS FILE
 - Render with:  quarto render proposal.qmd
 -->
 
-
 ## Task and motivation
+In this project I will classify the direct driver of a forest-loss event from a satellite image, by predicting the label that is associated with the given satellite image. This matters for nature/environment because if the cause of the forest loss can be detected through one image, the government or the responsible parties can be held accountable quicker. Also actions to prevent forest loss can be implemented quicker. The dataset has satellite images from Indonesia. Indonesia has one of the highest deforestation rates in the world. 
 
-<!--
-- What is the task in one sentence (classify the direct driver of a forest-loss event from a satellite image)?
-- Why does it matter for nature/environment? (deforestation, emissions, biodiversity, zero-deforestation commitments)
-- Why Indonesia?
-- 1 citation for context (Irvin et al., 2020 is in the references below).
--->
-In this project I will classify the direct driver of a forest-loss event from a satellite image. This matters for nature/environment because if the cause of the forest loss can be detected through one image the government or the resposible parties can be held accountable quicker and actions to prevent forest loss can be inmplemented quicker. The dataset has satalite images from Indonesia, so that why I choose Indonesia as my scope. 
 
 ## Data
+The dataset I intend to use for this project is ForestNet (Irvin et al., 2020). This dataset, ForestNet, is a collection of 2,757 deforestation events in Indonesia. For each one it gives a satellite image of the area and an expert’s label saying what the forest was cleared for. 
+The events are patches of lost forest. Each event comes as an outline of the cleared area plus the year it happened. An expert interpreter then labelled the direct driver.
+The data is divided into 4 classes: Plantation, Smallholder agriculture, Grassland/shrubland, and Other. The classes are imbalanced, for example the grassland is only 10% of the dataset.
 
-<!--
-- Source and licence: ForestNet (Irvin et al., 2020), CC BY 4.0 annotations, Landsat 8 imagery.
-- What one example is: a Landsat 8 image centred on a forest-loss event, plus the loss-region polygon.
-- Classes: plantation, smallholder agriculture, grassland/shrubland, other.
-- Size and split: refer to the table produced by the code below. Mention that the splits do not overlap spatially (why that matters: leakage).
-- Note the class imbalance you see in the table.
--->
+The data is split 1616/473/668 (2757). Images in different splits don't overlap spatially, so the test set measures how well the model works on new areas, not on neighboring pixels it has seen before. The validation and test labels were also checked by hand and corrected where needed, so they're cleaner than the training labels. 
+
 
 
 ```{python}
@@ -55,7 +46,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-DATA_DIR = Path("data/ForestNetDataset")  # folder created by unzipping ForestNetDataset.zip
+DATA_DIR = Path("deep/downloads/ForestNetDataset")  # folder created by unzipping ForestNetDataset.zip
 
 if not DATA_DIR.exists():
     raise FileNotFoundError(
@@ -122,33 +113,18 @@ else:
 ```
 
 ## Data processing
+I will use one cloud-reduced composite per event, so each event counts once. The four merged classes will become integer labels, and I will keep the official spatial split. Images will be centre-cropped to 160×160 px (≈2.4 km) around the loss region, excluding surrounding land use. I will scale pixel values and standardise each band using training-set statistics (ImageNet statistics for the pretrained RGB CNN). I will augment training images with flips and 90° rotations, since overhead imagery has no natural orientation. The loss will be weighted inversely to class frequency (grassland/shrubland ≈10%), with matching class weights in the random forest.
 
-<!--
-- Which image you use per example (the composite) and how you handle the extra scenes.
-- Normalisation per band; crop around the loss region (paper: 160 x 160 px).
-- Augmentation: flips / 90-degree rotations (why these make sense for top-down imagery).
-- How you deal with the class imbalance (class weights).
-- Features for the baseline: per-band summary statistics (mean, std, min, max), NDVI if infrared is available.
--->
 
 ## Methods
+A random forest is going to be used as a baseline on the summary features. The main model that will be used is an ImageNet-pretrained CNN (ResNet-18).
+With only 1,616 training images, a ResNet-18 trained from scratch would overfit. ImageNet-pretrained features such as edges, textures and shapes transfer well to satellite imagery, so fine-tuning only needs to adapt the later layers.
+The classes differ mainly in spatial pattern, like plantation rows or irregular smallholder plots. In ForestNet, a CNN reached 0.70 macro-F1 against 0.44 for a random forest. I keep the random forest as a baseline to measure what spatial pattern adds.
 
-<!--
-- Baseline: random forest on the summary features. (Paper's RF on visible bands: test macro-F1 0.44.)
-- Main model: ImageNet-pretrained CNN (e.g. ResNet-18), fine-tuned on Colab.
-- Justify: why transfer learning with ~1,600 training images, why a CNN over hand-made features.
-- Optional comparison: RGB only vs. RGB + infrared bands.
--->
 
 ## Evaluation
+My main metric will be macro-F1, which weights the small grassland/shrubland class equally with plantation. Always predicting “plantation” gives 40% accuracy but only 0.14 macro-F1, which will be my majority-class baseline. I will also report per-class F1 and a confusion matrix. Using the official spatial split, I will tune on validation and test once. Then I will analyse grassland–smallholder confusions and use Grad-CAM to check whether the model focuses on the cleared area.
 
-<!--
-- Metric: macro-F1 + per-class F1 + confusion matrix. Why not accuracy (smallest class is ~10%).
-- Use the official spatially separated test set; tune only on the validation set.
-- Planned analysis: grassland/shrubland vs. smallholder confusion; Grad-CAM to see whether the model
-  looks at the cleared area or the surroundings; examples of errors.
-- Potential impacts you want to discuss later (good and bad).
--->
 
 ## Weekly milestones
 
@@ -156,14 +132,13 @@ else:
 |---|---|
 | 6 to 8 Nov | Dataset downloaded and opened; proposal rendered and submitted |
 | 9 to 13 Nov | Preprocessing pipeline; random-forest baseline with macro-F1 and confusion matrix |
-| 16 to 20 Nov | Fine-tuned CNN on Colab; band comparison; Grad-CAM and error analysis |
+| 16 to 20 Nov | Fine-tuned CNN on Colab; Grad-CAM and error analysis |
 | 23 to 25 Nov | Report written (introduction, method, results, discussion, AI statement) |
 | 26 Nov | 7-minute presentation recorded; final render; zip prepared |
 | 27 Nov | Buffer for unexpected issues; final submission |
 
 ## AI usage statement
-
-<!-- Describe what you used GenAI for (e.g. dataset search, code). The prose of this proposal must be your own. -->
+I used Claude to help me understand the dataset and the project. I used Claude Code to render me a qmd template.   
 
 ## References
 
