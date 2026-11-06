@@ -23,6 +23,7 @@ HOW TO USE THIS FILE
 - Render with:  quarto render proposal.qmd
 -->
 
+
 ## Task and motivation
 
 <!--
@@ -31,6 +32,7 @@ HOW TO USE THIS FILE
 - Why Indonesia?
 - 1 citation for context (Irvin et al., 2020 is in the references below).
 -->
+In this project I will classify the direct driver of a forest-loss event from a satellite image. This matters for nature/environment because if the cause of the forest loss can be detected through one image the government or the resposible parties can be held accountable quicker and actions to prevent forest loss can be inmplemented quicker. The dataset has satalite images from Indonesia, so that why I choose Indonesia as my scope. 
 
 ## Data
 
@@ -41,6 +43,7 @@ HOW TO USE THIS FILE
 - Size and split: refer to the table produced by the code below. Mention that the splits do not overlap spatially (why that matters: leakage).
 - Note the class imbalance you see in the table.
 -->
+
 
 ```{python}
 #| label: data-check
