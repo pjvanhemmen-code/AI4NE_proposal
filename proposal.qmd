@@ -1,0 +1,169 @@
+---
+title: "Project proposal: Classifying drivers of deforestation in Indonesia"
+subtitle: "AI for Nature and Environment, individual coding project"
+author: "Joran van Hemmen"
+date: today
+format:
+  html:
+    embed-resources: true
+    code-fold: true
+    code-summary: "Show code"
+    theme: cosmo
+jupyter: python3
+execute:
+  warning: false
+---
+
+<!--
+HOW TO USE THIS FILE
+- Write your own prose under each heading (target: 250-500 words in total, code not counted).
+- The comments like this one are prompts for you; they do not show up in the rendered HTML.
+- Put the unzipped dataset at data/ForestNetDataset/ next to this file
+  (download: http://download.cs.stanford.edu/deep/ForestNetDataset.zip), or change DATA_DIR below.
+- Render with:  quarto render proposal.qmd
+-->
+
+## Task and motivation
+
+<!--
+- What is the task in one sentence (classify the direct driver of a forest-loss event from a satellite image)?
+- Why does it matter for nature/environment? (deforestation, emissions, biodiversity, zero-deforestation commitments)
+- Why Indonesia?
+- 1 citation for context (Irvin et al., 2020 is in the references below).
+-->
+
+## Data
+
+<!--
+- Source and licence: ForestNet (Irvin et al., 2020), CC BY 4.0 annotations, Landsat 8 imagery.
+- What one example is: a Landsat 8 image centred on a forest-loss event, plus the loss-region polygon.
+- Classes: plantation, smallholder agriculture, grassland/shrubland, other.
+- Size and split: refer to the table produced by the code below. Mention that the splits do not overlap spatially (why that matters: leakage).
+- Note the class imbalance you see in the table.
+-->
+
+```{python}
+#| label: data-check
+#| code-fold: true
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from PIL import Image
+
+DATA_DIR = Path("data/ForestNetDataset")  # folder created by unzipping ForestNetDataset.zip
+
+if not DATA_DIR.exists():
+    raise FileNotFoundError(
+        f"{DATA_DIR.resolve()} not found. Unzip ForestNetDataset.zip there or edit DATA_DIR."
+    )
+
+# Load the official train / val / test splits
+splits = {}
+for name in ["train", "val", "test"]:
+    csv = next(DATA_DIR.rglob(f"{name}.csv"))
+    splits[name] = pd.read_csv(csv).assign(split=name)
+df = pd.concat(splits.values(), ignore_index=True)
+
+# 4-class label column ('merged_label' in ForestNet; fall back to 'label')
+LABEL = "merged_label" if "merged_label" in df.columns else "label"
+CSV_ROOT = csv.parent
+
+
+def example_dir(path_str):
+    """Resolve an example folder from the CSV's example_path column."""
+    for cand in (CSV_ROOT / path_str, CSV_ROOT / "examples" / path_str, DATA_DIR / path_str):
+        if cand.exists():
+            return cand
+    raise FileNotFoundError(path_str)
+
+
+def visible_image(ex_dir):
+    """Return the composite RGB image of one example (or the first visible PNG)."""
+    vis = ex_dir / "images" / "visible"
+    comp = vis / "composite.png"
+    return Image.open(comp if comp.exists() else sorted(vis.glob("*.png"))[0])
+
+
+print(f"Columns: {list(df.columns)}")
+print(f"Examples loaded: {len(df)}")
+
+counts = pd.crosstab(df[LABEL], df["split"], margins=True, margins_name="total")
+counts[["train", "val", "test", "total"]]
+```
+
+```{python}
+#| label: fig-examples
+#| fig-cap: "One training example per driver class (Landsat 8 composite, visible bands)."
+classes = sorted(df[LABEL].unique())
+train = df[df["split"] == "train"]
+
+fig, axes = plt.subplots(1, len(classes), figsize=(3 * len(classes), 3.3))
+for ax, cls in zip(np.atleast_1d(axes), classes):
+    row = train[train[LABEL] == cls].iloc[0]
+    img = visible_image(example_dir(row["example_path"]))
+    ax.imshow(img)
+    ax.set_title(f"{cls}\n({row['year']})" if "year" in row else cls, fontsize=10)
+    ax.axis("off")
+plt.tight_layout()
+plt.show()
+
+# Which extra bands are available? (useful for the RGB vs. all-bands comparison)
+ex = example_dir(train.iloc[0]["example_path"])
+ir = sorted((ex / "images" / "infrared").glob("*.npy"))
+if ir:
+    print(f"Infrared array shape for one example: {np.load(ir[0]).shape}")
+else:
+    print("No infrared .npy files found for this example.")
+```
+
+## Data processing
+
+<!--
+- Which image you use per example (the composite) and how you handle the extra scenes.
+- Normalisation per band; crop around the loss region (paper: 160 x 160 px).
+- Augmentation: flips / 90-degree rotations (why these make sense for top-down imagery).
+- How you deal with the class imbalance (class weights).
+- Features for the baseline: per-band summary statistics (mean, std, min, max), NDVI if infrared is available.
+-->
+
+## Methods
+
+<!--
+- Baseline: random forest on the summary features. (Paper's RF on visible bands: test macro-F1 0.44.)
+- Main model: ImageNet-pretrained CNN (e.g. ResNet-18), fine-tuned on Colab.
+- Justify: why transfer learning with ~1,600 training images, why a CNN over hand-made features.
+- Optional comparison: RGB only vs. RGB + infrared bands.
+-->
+
+## Evaluation
+
+<!--
+- Metric: macro-F1 + per-class F1 + confusion matrix. Why not accuracy (smallest class is ~10%).
+- Use the official spatially separated test set; tune only on the validation set.
+- Planned analysis: grassland/shrubland vs. smallholder confusion; Grad-CAM to see whether the model
+  looks at the cleared area or the surroundings; examples of errors.
+- Potential impacts you want to discuss later (good and bad).
+-->
+
+## Weekly milestones
+
+| Dates | Milestone |
+|---|---|
+| 6 to 8 Nov | Dataset downloaded and opened; proposal rendered and submitted |
+| 9 to 13 Nov | Preprocessing pipeline; random-forest baseline with macro-F1 and confusion matrix |
+| 16 to 20 Nov | Fine-tuned CNN on Colab; band comparison; Grad-CAM and error analysis |
+| 23 to 25 Nov | Report written (introduction, method, results, discussion, AI statement) |
+| 26 Nov | 7-minute presentation recorded; final render; zip prepared |
+| 27 Nov | Buffer for unexpected issues; final submission |
+
+## AI usage statement
+
+<!-- Describe what you used GenAI for (e.g. dataset search, code). The prose of this proposal must be your own. -->
+
+## References
+
+Irvin, J., Sheng, H., Ramachandran, N., Johnson-Yu, S., Zhou, S., Story, K., Rustowicz, R., Elsworth, C., Austin, K., & Ng, A. Y. (2020). ForestNet: Classifying drivers of deforestation in Indonesia using deep learning on satellite imagery. *NeurIPS 2020 Workshop on Tackling Climate Change with Machine Learning*. <https://arxiv.org/abs/2011.05479>
+
+Dataset: <https://stanfordmlgroup.github.io/projects/forestnet>
